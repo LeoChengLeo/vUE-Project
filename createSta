@@ -1,0 +1,132 @@
+#!/bin/bash 
+
+display_usage()
+{
+echo "
+Usage:
+-I, Indicate station name, bring up a virtual interface as same name
+-S, Indicate SSID
+-K, Indicate psk if WPA-PSK is used (If not indicate, open network configuration will be used)
+-H, Inidcate wireless hardware device (If not indicate, default is phy0)
+-h, Show Usage
+
+Eexample: $0 -I sta0 -S myssid -H phy1
+          $0 -I sta1 -S myssid -K mySecretPsk -H phy1
+ "
+}
+
+
+if [ $# -lt 2 ]; then 
+	display_usage
+	exit 1
+fi
+
+
+staName=''
+phy='phy0'
+ssid=''
+psk=''
+
+if [ -z "$(pgrep vUE-rfald)" ]; then
+	echo Fail to create virtual station. No rafld is running
+	exit 1
+fi
+
+
+
+while [ "$1" != "" ]; do
+	case $1 in 
+	-I) 
+		shift
+		staName=$1
+		;;
+	-S)
+		shift
+	        ssid=$1
+		;;
+	-K)     
+		shift
+		psk=$1
+		;;
+	-H)
+		shift
+		phy=$1
+		;;
+	-h)
+		display_usage
+		exit 1
+		;;
+	*)
+		display_usage
+		exit 1
+	esac
+	shift
+done
+
+	        	
+	
+
+ps -aux | grep wpa_supplicant| grep $staName  
+if [ $? -eq 0 ]; then
+	echo Fail to create wifi station. $staName exits
+        exit 1
+fi
+
+
+
+iw phy $phy interface add $staName type managed 
+
+if [ $? -ne 0 ]; then
+	echo Fail to create virtual interface $staName
+	exit 1
+else    
+	ifconfig $staName up
+	if [ $? -eq 0 ];then
+		echo Successfully bring up virtual interface on phy0
+	else
+		echo Fail to bring up virtual interface
+	        iw dev $staName del	
+		echo Deleted $staName
+		exit 1
+	fi
+fi
+
+
+
+if [ -z "$psk" ]; then
+
+cat >/etc/wpa_supplicant/wpa_$staName.conf<<EOF
+ctrl_interface=/var/run/wpa_supplicant
+update_config=1
+network={
+ssid="$ssid"
+key_mgmt=NONE
+}
+EOF
+
+echo Creating configuration file wpa_$staName.conf in /etc/wpa_supplicant
+
+else
+
+cat >/etc/wpa_supplicant/wpa_$staName.conf<<EOF
+ctrl_interface=/var/run/wpa_supplicant
+update_config=1
+network={
+ssid="$ssid"
+key_mgmt=WPA-PSK
+psk="$psk"
+}
+EOF
+
+echo Create configuration file wpa_$staName.conf in /etc/wpa_supplicant
+
+fi
+
+wpa_supplicant -Dnl80211 -i $staName -c/etc/wpa_supplicant/wpa_$staName.conf -B
+
+
+echo Running dhclient on $staName
+dhclient $staName -nw 
+
+exit 0
+
