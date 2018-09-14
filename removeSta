@@ -1,0 +1,42 @@
+#!/bin/bash 
+
+
+
+if [ $# -lt 1 ]; then 
+echo 'usage: '$0' [station name]'
+exit 1
+fi
+
+staID=$(ps -aux| grep wpa_supplicant| grep $1| grep -oP ' \K\S+'| head -n 1)
+
+kill -9 $staID>>/dev/null 2>&1
+
+if [ $? -eq 0 ]; then 
+
+echo Successfully killed wpa_supplicant on $1
+
+rm /etc/wpa_supplicant/wpa_$1.conf 
+echo removing wpa_$1.conf from /etc/wpa_supplicant/
+
+else
+echo Fail to kill  wpa_supplicant on $1
+fi
+
+
+if [ -n "$(ps -aux| grep dhclient | grep $1| grep -oP " \K\S+"| head -n 1)" ];then
+        echo stoped dhclient service on $1	
+	kill $(ps -aux| grep dhclient | grep $1| grep -oP " \K\S+"| head -n 1)
+else
+	echo No dhclient running on $1
+fi
+
+iw dev $1 del 
+
+if [ $? -eq 0 ]; then 
+echo Removed interface $1
+else
+echo Could not bring interface $1 down
+fi 
+
+exit 0
+

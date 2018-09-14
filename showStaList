@@ -1,0 +1,26 @@
+#!/bin/bash 
+
+
+
+
+if [ -z "$(pgrep wpa_supplicant)" ];then 
+	echo No VUE is running....
+	exit 0
+fi
+
+i=1
+staName=$(ps -aux| grep wpa_supplicant| sed -n "$i p"|cut -d'-' -f3|cut -d'i' -f2)
+
+
+while [ -n "$staName" ];
+do 
+
+	 iwconfig $staName 2>>/dev/null | head -n 2
+	 echo "  $(ifconfig $staName 2>>/dev/null | grep inet)"
+         echo " "
+	i=$(($i+1))
+	staName=$(ps -aux| grep wpa_supplicant| sed -n "$i p"|cut -d'-' -f3|cut -d'i' -f2)
+done 
+
+
+exit 0

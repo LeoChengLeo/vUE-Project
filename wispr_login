@@ -1,0 +1,109 @@
+#!/bin/bash
+
+display_usage(){
+
+echo "
+Usage: $0 [-i station Interface] [-u username] [-p password] [-v URL]
+-i, Indicate station interface name
+-u, Username for login 
+-p, Password for login
+-v, URL attempt to vist (default is http://www.google.com)
+-h, Help
+
+Example. $0 -i sta0 -u leo -p 12345678 -v http://www.google.com
+"
+}
+
+
+
+if [ $# -lt 1 ]; then 
+	display_usage
+	exit 1
+fi
+
+INTERFACE=""
+USERNAME=""
+PASSWORD=""
+URL="http://www.google.com"
+
+while [ "$1" != "" ]; do
+    case $1 in
+        -i)
+            shift
+            INTERFACE=$1
+            ;;
+        -u)
+            shift
+            USERNAME=$1
+            ;;
+        -p)
+            shift
+            PASSWORD=$1
+            ;;
+	-v)
+	    shift 
+	    URL=$1
+	    ;;
+        -h)
+            display_usage
+            exit 1
+            ;;
+        *)
+            display_usage
+            exit 1
+    esac
+    shift
+done
+
+[ -z $INTERFACE ] && echo "Missing interface" && display_usage && exit 2;
+
+
+dir=~/vUE_login_webPage
+if [ ! -d "$dir" ];then 
+	mkdir $dir
+fi	
+
+curl --interface $INTERFACE -k -L $URL >$dir/$INTERFACE.log
+
+OK=`grep Ruckus $dir/${INTERFACE}.log`
+
+if [ -z "$OK" ]; then
+    echo "Redirect failed"
+    exit 1
+else
+    echo "Redirect success, Saved login page to $dir/$INTERFACE.log"
+fi
+
+i=1
+post_cont=""
+while [ -n "$(cat $dir/$INTERFACE.log| grep input| grep name| grep value| sed -n "$i p")" ]
+do
+	name=$(cat $dir/$INTERFACE.log | grep input | grep name | grep value | sed -n "$i p"| grep -oP 'name=\K\S+'|cut -d'"' -f2)
+	value=$(cat $dir/$INTERFACE.log | grep input | grep name | grep value | sed -n "$i p"| grep -oP 'value=\K\S+'|cut -d'"' -f2)
+        if [ $i -eq 1 ];then
+		post_cont="$name=$value"	
+	else
+		post_cont="$post_cont&$name=$value"
+	fi
+	i=$(($i+1))
+		
+done
+
+post_cont="$post_cont&UE-Username=$USERNAME&UE-Password=$PASSWORD"
+echo $post_cont
+
+TARGET=https://scg.ruckuswireless.com:9998/SubscriberPortal/login
+
+curl --interface $INTERFACE -k -d "$post_cont" $TARGET >>$dir/login_succe_$INTERFACE.log 
+
+wget --no-check-certificate -O $dir/web_${INTERFACE}.log  $URL >>/dev/null 2>/dev/null
+OK=`grep Ruckus $dir/web_${INTERFACE}.log`
+
+if [ -z "$OK" ]; then
+    echo "Login success, Saved login_success_$INTERFACE.log and $URL web page web_$INTERFACE.log on $dir/"
+else
+    echo "Failed"
+fi
+
+exit 0
+
