@@ -1,2 +1,2 @@
 # vUE-Project
-virtual user endpoint( virtual  IEEE80211 client)
+virtual user endpoint( virtual IEEE802.11 wireless client)
